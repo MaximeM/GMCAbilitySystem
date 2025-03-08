@@ -54,7 +54,31 @@ void UGMCAbilityEffect::InitializeEffect(FGMCAbilityEffectData InitializationDat
 void UGMCAbilityEffect::StartEffect()
 {
 	bHasStarted = true;
+	UE_LOG(LogTemp, Warning, TEXT("EffectTag: %s"), *EffectData.EffectTag.ToString());
+	UE_LOG(LogTemp, Warning, TEXT("GameCues: %s"), *EffectData.GameCues.ToString());
+	UE_LOG(LogTemp, Warning, TEXT("GrantedTags: %s"), *EffectData.GrantedTags.ToString());
 
+
+	if (!EffectData.GameCues.IsEmpty())
+	{
+		for (auto Cue : EffectData.GameCues)
+		
+		{
+			if (OwnerAbilityComponent == nullptr)
+			{
+				OwnerAbilityComponent = EffectData.OwnerAbilityComponent;
+			}
+			if (OwnerAbilityComponent != nullptr)
+			{
+				OwnerAbilityComponent->TriggerCueByTag(Cue, OwnerAbilityComponent->GetOwner());
+			}else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("NO ABILITY COMP"));
+			}
+
+		}
+	}
+	
 	// Ensure tag requirements are met before applying the effect
 	if( ( EffectData.ApplicationMustHaveTags.Num() > 0 && !DoesOwnerHaveTagFromContainer(EffectData.ApplicationMustHaveTags) ) ||
 	DoesOwnerHaveTagFromContainer(EffectData.ApplicationMustNotHaveTags) ||

@@ -11,6 +11,7 @@
 #include "Ability/Tasks/GMCAbilityTaskData.h"
 #include "Effects/GMCAbilityEffect.h"
 #include "Components/ActorComponent.h"
+#include "Cues/GMC_AbilityCueManager.h"
 #include "Utility/GMASBoundQueue.h"
 #include "Utility/GMASSyncedEvent.h"
 #include "GMCAbilityComponent.generated.h"
@@ -188,6 +189,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GMCAbilitySystem")
 	TArray<FGameplayTag> GetActiveTagsByParentTag(const FGameplayTag ParentTag);
 
+	/* CUES */
+	UFUNCTION(BlueprintCallable, Category = "GMCAbilitySystem|Cues")
+	void TriggerCueByTag(FGameplayTag Tag, AActor* TargetActor);
+
+	UFUNCTION( NetMulticast , Unreliable )
+	void MulticastTriggerCueByTag(FGameplayTag Tag, AActor* TargetActor);
+
+
+
+	UPROPERTY()
+	UGMC_AbilityCueManager* GameCueManager;
+
+	
 	// Do not call directly on client, go through QueueAbility
 	void TryActivateAbilitiesByInputTag(const FGameplayTag& InputTag, const UInputAction* InputAction = nullptr, bool bFromMovementTick=true);
 	

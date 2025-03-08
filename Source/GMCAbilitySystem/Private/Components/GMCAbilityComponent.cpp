@@ -21,6 +21,13 @@ UGMC_AbilitySystemComponent::UGMC_AbilitySystemComponent(const FObjectInitialize
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 	SetIsReplicatedByDefault(true);
+	
+	if ( GameCueManager == nullptr)
+	{
+		GameCueManager = ObjectInitializer.CreateDefaultSubobject<UGMC_AbilityCueManager>(this, TEXT("CueManager"));
+	}
+
+
 }
 
 FDelegateHandle UGMC_AbilitySystemComponent::AddFilteredTagChangeDelegate(const FGameplayTagContainer& Tags,
@@ -322,6 +329,112 @@ TArray<FGameplayTag> UGMC_AbilitySystemComponent::GetActiveTagsByParentTag(const
 	}
 	return MatchedTags;
 }
+void UGMC_AbilitySystemComponent::TriggerCueByTag(FGameplayTag Tag, AActor* TargetActor)
+{
+	UClass* CueClass = GameCueManager->LoadCueReference(Tag);
+
+	if (CueClass == nullptr)
+	{
+		UE_LOG(LogTemp, Error, TEXT("INVALID CUE CLASS"));
+		return;
+	}
+
+	if (TargetActor && IsValid(TargetActor))
+	{
+
+
+		if (CueClass && CueClass->IsChildOf(AActor::StaticClass()))
+		{
+			// Spawn and execute the cue on the client
+			AGameCue_Actor* CueToPlay = NewObject<AGameCue_Actor>(TargetActor, CueClass);
+			if (CueToPlay)
+			{
+				// If we're on the server, multicast the cue to clients
+				if (HasAuthority())
+				{
+					MulticastTriggerCueByTag(Tag, TargetActor); // Call the multicast function to trigger the cue on all clients
+				}
+
+				// Execute the cue immediately on the server
+				CueToPlay->ExecuteCue(TargetActor);
+				UE_LOG(LogTemp, Log, TEXT("Executed cue for tag: %s on server"), *Tag.ToString());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Failed to create cue instance for tag: %s"), *Tag.ToString());
+			}
+		}else
+		{
+			// Spawn and execute the cue on the client
+			UGameCue_Object* CueToPlay = NewObject<UGameCue_Object>(TargetActor, CueClass);
+			if (CueToPlay)
+			{
+				// If we're on the server, multicast the cue to clients
+				if (HasAuthority())
+				{
+					MulticastTriggerCueByTag(Tag, TargetActor); // Call the multicast function to trigger the cue on all clients
+				}
+
+				// Execute the cue immediately on the server
+				CueToPlay->ExecuteCue(TargetActor);
+				UE_LOG(LogTemp, Log, TEXT("Executed cue for tag: %s on server"), *Tag.ToString());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Failed to create cue instance for tag: %s"), *Tag.ToString());
+			}
+		}
+	}
+}
+
+void UGMC_AbilitySystemComponent::MulticastTriggerCueByTag_Implementation(FGameplayTag Tag, AActor* TargetActor)
+{
+    if (TargetActor && IsValid(TargetActor))
+    {
+        // Load the appropriate cue class based on the tag
+        UClass* CueClass = GameCueManager->LoadCueReference(Tag);
+
+        if (CueClass)
+        {
+            // Check if the cue class is an actor class (AGameCue_Actor)
+            if (CueClass->IsChildOf(AGameCue_Actor::StaticClass()))
+            {
+                // Spawn the actor-based cue in the world
+                AGameCue_Actor* CueActor = GetWorld()->SpawnActor<AGameCue_Actor>(CueClass, TargetActor->GetActorLocation(), FRotator::ZeroRotator);
+                if (CueActor)
+                {
+                    // Execute the cue (assuming there's an ExecuteCue method on the AGameCue_Actor class)
+                    CueActor->ExecuteCue(TargetActor);
+                    UE_LOG(LogTemp, Log, TEXT("Executed actor-based cue for tag: %s on client"), *Tag.ToString());
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("Failed to spawn actor-based cue for tag: %s on client"), *Tag.ToString());
+                }
+            }
+            else
+            {
+                // Handle non-actor-based cues (UGameCue_Object)
+                UGameCue_Object* CueToPlay = NewObject<UGameCue_Object>(TargetActor, CueClass);
+                if (CueToPlay)
+                {
+                    // Execute the cue on the object
+                    CueToPlay->ExecuteCue(TargetActor);
+                    UE_LOG(LogTemp, Log, TEXT("Executed object-based cue for tag: %s on client"), *Tag.ToString());
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("Failed to create object-based cue for tag: %s on client"), *Tag.ToString());
+                }
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("INVALID CUE CLASS on client"));
+        }
+    }
+}
+
 
 void UGMC_AbilitySystemComponent::TryActivateAbilitiesByInputTag(const FGameplayTag& InputTag, const UInputAction* InputAction, bool bFromMovementTick)
 {
@@ -609,6 +722,8 @@ void UGMC_AbilitySystemComponent::PreRemoteMoveExecution()
 void UGMC_AbilitySystemComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	GameCueManager->OnInit();
 	
 	InitializeStartingAbilities();
 	InitializeAbilityMap();
@@ -1178,11 +1293,8 @@ UGMCAbilityEffect* UGMC_AbilitySystemComponent::ProcessOperation(
 		UGMCAbilityEffect* Effect = DuplicateObject(Operation.ItemClass->GetDefaultObject<UGMCAbilityEffect>(), this);
 		FGMCAbilityEffectData EffectData = Operation.Payload;
 
-		if (!EffectData.IsValid())
-		{
-			EffectData = Effect->EffectData;
-		}
-		
+
+
 		if (Operation.Header.PayloadIds.Ids.Num() > 0)
 		{
 			EffectData.EffectID = Operation.Header.PayloadIds.Ids[0];
@@ -1763,7 +1875,10 @@ UGMCAbilityEffect* UGMC_AbilitySystemComponent::ApplyAbilityEffect(UGMCAbilityEf
 		UE_LOG(LogGMCAbilitySystem, Error, TEXT("Trying to apply Effect, but effect is null!"));
 		return nullptr;
 	}
-	
+
+	//loooosing here!
+
+	InitializationData = Effect->EffectData;
 	
 	// Force the component this is being applied to to be the owner
 	InitializationData.OwnerAbilityComponent = this;

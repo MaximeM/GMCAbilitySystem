@@ -109,6 +109,11 @@ struct FGMCAbilityEffectData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GMCAbilitySystem")
 	FGameplayTagContainer GrantedTags;
 
+
+	//CUES
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GMCAbilitySystem")
+	FGameplayTagContainer GameCues;
+	
 	// Whether to preserve the granted tags if multiple instances of the same effect are applied
 	// If false, will remove all stacks of the tag
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "GMCAbilitySystem")
@@ -163,6 +168,8 @@ struct FGMCAbilityEffectData
 	FString ToString() const{
 		return FString::Printf(TEXT("[id: %d] [Tag: %s] (Duration: %.3lf) (CurrentDuration: %.3lf)"), EffectID, *EffectTag.ToString(), Duration, CurrentDuration);
 	}
+
+
 };
 
 /**
