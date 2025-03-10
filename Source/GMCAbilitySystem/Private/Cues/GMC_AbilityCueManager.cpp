@@ -2,15 +2,16 @@
 
 
 #include "Cues/GMC_AbilityCueManager.h"
-
 #include "GameplayTagContainer.h"
-#include "GMCAbilityComponent.h"
 #include "Cues/GameCue_Object.h"
 #include "Engine/World.h"
-#include "Particles/ParticleSystemComponent.h"
-#include "Sound/SoundCue.h"
 #include "Animation/AnimMontage.h"
 #include "Engine/ObjectLibrary.h"
+
+
+
+
+
 
 UGMC_AbilityCueManager::UGMC_AbilityCueManager()
 {
@@ -224,5 +225,27 @@ void UGMC_AbilityCueManager::LoadGameCueActorsFromPath(const FString& Path)
 	
 		// Clean up
 		ObjectLibrary->RemoveFromRoot();
+}
+
+void UGMC_AbilityCueManager::OnEffectRemoved(int EffectID)
+{
+	int WasRemoved = ActiveEffects.Remove(EffectID);
+	if (WasRemoved == -1)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Effect ID does not exists"));
+
+		
+	}
+	//UE_LOG(LogTemp, Warning, TEXT("Effect ID: %d Removed"), EffectID);
+}
+
+void UGMC_AbilityCueManager::OnEffectAdded(int EffectID, UObject* Object)
+{
+	int WasAdded = ActiveEffects.AddUnique(EffectID);
+	if (WasAdded == -1)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Effect ID already exists"));
+	}
+	//UE_LOG(LogTemp, Warning, TEXT("Effect ID: %d added"), EffectID);
 }
 

@@ -32,7 +32,7 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "GMCAbilitySystem")
 	virtual UWorld* GetWorld() const override;
-	
+
 	//// Ability State
 	// EAbilityState. Use Getters/Setters
 	UPROPERTY(BlueprintReadOnly, Category = "GMCAbilitySystem")
@@ -227,6 +227,15 @@ public:
 	virtual void OnGameplayTaskInitialized(UGameplayTask& Task) override;
 	virtual void OnGameplayTaskActivated(UGameplayTask& Task) override;
 	virtual void OnGameplayTaskDeactivated(UGameplayTask& Task) override;
+
+
+	// Some Function for Ability effects
+	UFUNCTION(BlueprintPure,Category = "GMCAbilitySystem", meta=(Categories="Ability"))
+	static FGMCAbilityEffectData GetEffectData(TSubclassOf<UGMCAbilityEffect> EffectClass);
+	
+	UFUNCTION(BlueprintCallable,Category = "GMCAbilitySystem", meta=(Categories="Ability"))
+	FGMCAbilityEffectData ChangeModifierTagValue(FGMCAbilityEffectData EffectData, FGameplayTag AttributeTag, float Value, bool& bWasModified);
+
 	
 private:
 

@@ -26,11 +26,23 @@ struct FGMCAttributeModifier
 	float Value{0};
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "GMCAbilitySystem")
+	UCurveTable* AttributeCurve{nullptr};
+	
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "GMCAbilitySystem")
 	EModifierType ModifierType{EModifierType::Add};
 
 	// Metadata tags to be passed with the attribute
 	// Ie: DamageType (Element.Fire, Element.Electric), DamageSource (Source.Player, Source.Boss), etc
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "GMCAbilitySystem")
 	FGameplayTagContainer MetaTags;
+
+	bool operator==(const FGMCAttributeModifier& Other) const
+	{
+		return AttributeTag == Other.AttributeTag &&
+			   FMath::IsNearlyEqual(Value, Other.Value) && // Use float comparison for Value
+			   MetaTags == Other.MetaTags &&
+			   ModifierType == Other.ModifierType;
+	}
 	
 };

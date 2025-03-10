@@ -10,6 +10,8 @@
 #include "Ability/GMCAbilityMapData.h"
 #include "Attributes/GMCAttributesData.h"
 #include "Effects/GMCAbilityEffect.h"
+#include "Cues/GameCue_Actor.h"
+#include "Cues/GameCue_Object.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Net/UnrealNetwork.h"
 
@@ -329,8 +331,11 @@ TArray<FGameplayTag> UGMC_AbilitySystemComponent::GetActiveTagsByParentTag(const
 	}
 	return MatchedTags;
 }
-void UGMC_AbilitySystemComponent::TriggerCueByTag(FGameplayTag Tag, AActor* TargetActor)
+void UGMC_AbilitySystemComponent::TriggerCueByTag(FGameplayTag Tag, AActor* TargetActor, float Duration, int Effect_ID)
 {
+
+
+	
 	UClass* CueClass = GameCueManager->LoadCueReference(Tag);
 
 	if (CueClass == nullptr)
@@ -338,6 +343,9 @@ void UGMC_AbilitySystemComponent::TriggerCueByTag(FGameplayTag Tag, AActor* Targ
 		UE_LOG(LogTemp, Error, TEXT("INVALID CUE CLASS"));
 		return;
 	}
+
+
+
 
 	if (TargetActor && IsValid(TargetActor))
 	{
@@ -356,7 +364,7 @@ void UGMC_AbilitySystemComponent::TriggerCueByTag(FGameplayTag Tag, AActor* Targ
 				}
 
 				// Execute the cue immediately on the server
-				CueToPlay->ExecuteCue(TargetActor);
+				//CueToPlay->ExecuteCue(TargetActor);
 				UE_LOG(LogTemp, Log, TEXT("Executed cue for tag: %s on server"), *Tag.ToString());
 			}
 			else
@@ -369,14 +377,13 @@ void UGMC_AbilitySystemComponent::TriggerCueByTag(FGameplayTag Tag, AActor* Targ
 			UGameCue_Object* CueToPlay = NewObject<UGameCue_Object>(TargetActor, CueClass);
 			if (CueToPlay)
 			{
-				// If we're on the server, multicast the cue to clients
+		
 				if (HasAuthority())
 				{
-					MulticastTriggerCueByTag(Tag, TargetActor); // Call the multicast function to trigger the cue on all clients
+					MulticastTriggerCueByTag(Tag, TargetActor,Duration, Effect_ID); // Call the multicast function to trigger the cue on all clients
 				}
-
-				// Execute the cue immediately on the server
-				CueToPlay->ExecuteCue(TargetActor);
+				CueToPlay->HandleGameCue(TargetActor, Duration,this,Effect_ID);
+				
 				UE_LOG(LogTemp, Log, TEXT("Executed cue for tag: %s on server"), *Tag.ToString());
 			}
 			else
@@ -387,12 +394,29 @@ void UGMC_AbilitySystemComponent::TriggerCueByTag(FGameplayTag Tag, AActor* Targ
 	}
 }
 
-void UGMC_AbilitySystemComponent::MulticastTriggerCueByTag_Implementation(FGameplayTag Tag, AActor* TargetActor)
+void UGMC_AbilitySystemComponent::MultiCast_EffectRemoved_Implementation(int32 EffectID)
 {
+	if(this->GetOwner()->GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		OnEffectChanged.Broadcast(EffectID, false);
+
+		}
+}
+
+void UGMC_AbilitySystemComponent::MulticastTriggerCueByTag_Implementation(FGameplayTag Tag, AActor* TargetActor,float Duration, int Effect_ID)
+{
+
+	if ((this->GetNetMode() == NM_DedicatedServer))
+	{
+		return;
+	}
+	
     if (TargetActor && IsValid(TargetActor))
     {
         // Load the appropriate cue class based on the tag
         UClass* CueClass = GameCueManager->LoadCueReference(Tag);
+
+    	
 
         if (CueClass)
         {
@@ -418,8 +442,11 @@ void UGMC_AbilitySystemComponent::MulticastTriggerCueByTag_Implementation(FGamep
                 UGameCue_Object* CueToPlay = NewObject<UGameCue_Object>(TargetActor, CueClass);
                 if (CueToPlay)
                 {
-                    // Execute the cue on the object
-                    CueToPlay->ExecuteCue(TargetActor);
+                	if(this->GetOwner()->GetLocalRole() == ROLE_SimulatedProxy)
+                	{
+					CueToPlay->HandleGameCue(TargetActor, Duration,this,Effect_ID);
+                	}
+                
                     UE_LOG(LogTemp, Log, TEXT("Executed object-based cue for tag: %s on client"), *Tag.ToString());
                 }
                 else
@@ -967,6 +994,7 @@ void UGMC_AbilitySystemComponent::OnRep_ActiveEffectsData()
 			ApplyAbilityEffect(EffectCDO, EffectData);
 			ProcessedEffectIDs.Add(EffectData.EffectID, true);
 			UE_LOG(LogGMCAbilitySystem, VeryVerbose, TEXT("Replicated Effect: %d"), ActiveEffectData.EffectID);
+			OnEffectChanged.Broadcast(EffectData.EffectID, true);
 		}
 		
 		ProcessedEffectIDs[ActiveEffectData.EffectID] = true;
@@ -987,6 +1015,9 @@ void UGMC_AbilitySystemComponent::CheckRemovedEffects()
 		if (!ActiveEffectsData.ContainsByPredicate([Effect](const FGMCAbilityEffectData& EffectData) {return EffectData.EffectID == Effect.Key;}))
 		{
 			RemoveActiveAbilityEffect(Effect.Value);
+
+			OnEffectChanged.Broadcast(Effect.Value->EffectData.EffectID, false);
+
 		}
 	}
 }
@@ -1293,8 +1324,7 @@ UGMCAbilityEffect* UGMC_AbilitySystemComponent::ProcessOperation(
 		UGMCAbilityEffect* Effect = DuplicateObject(Operation.ItemClass->GetDefaultObject<UGMCAbilityEffect>(), this);
 		FGMCAbilityEffectData EffectData = Operation.Payload;
 
-
-
+		
 		if (Operation.Header.PayloadIds.Ids.Num() > 0)
 		{
 			EffectData.EffectID = Operation.Header.PayloadIds.Ids[0];
@@ -1308,7 +1338,6 @@ UGMCAbilityEffect* UGMC_AbilitySystemComponent::ProcessOperation(
 			return nullptr;
 		}
 		
-		ApplyAbilityEffect(Effect, EffectData);
 
 		for (auto& [EffectHandle, EffectHandleData] : EffectHandles)
 		{
@@ -1316,8 +1345,14 @@ UGMCAbilityEffect* UGMC_AbilitySystemComponent::ProcessOperation(
 			if (EffectHandleData.NetworkId <= 0 && EffectHandleData.OperationId == Operation.Header.OperationId)
 			{
 				EffectHandleData.NetworkId = Effect->EffectData.EffectID;
+				EffectData.EffectID = EffectHandleData.Handle;
+
 			}
 		}
+		
+
+		ApplyAbilityEffect(Effect, EffectData);
+
 		
 		return Effect;
 	}
@@ -1875,10 +1910,7 @@ UGMCAbilityEffect* UGMC_AbilitySystemComponent::ApplyAbilityEffect(UGMCAbilityEf
 		UE_LOG(LogGMCAbilitySystem, Error, TEXT("Trying to apply Effect, but effect is null!"));
 		return nullptr;
 	}
-
-	//loooosing here!
-
-	InitializationData = Effect->EffectData;
+	
 	
 	// Force the component this is being applied to to be the owner
 	InitializationData.OwnerAbilityComponent = this;
@@ -1913,6 +1945,15 @@ void UGMC_AbilitySystemComponent::RemoveActiveAbilityEffect(UGMCAbilityEffect* E
 	}
 	
 	if (!ActiveEffects.Contains(Effect->EffectData.EffectID)) return;
+
+
+	
+	GameCueManager->OnEffectRemoved(Effect->EffectData.EffectID);
+	OnEffectChanged.Broadcast(Effect->EffectData.EffectID, false);
+	if (HasAuthority())
+	{
+		MultiCast_EffectRemoved(Effect->EffectData.EffectID);
+	}
 	
 	Effect->EndEffect();
 }

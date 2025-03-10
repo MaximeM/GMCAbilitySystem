@@ -31,6 +31,7 @@ UWorld* UGMCAbility::GetWorld() const
 	return Contexts[0].World();
 }
 
+
 void UGMCAbility::Tick(float DeltaTime)
 {
 	if (!OwnerAbilityComponent->HasAuthority())
@@ -221,6 +222,67 @@ void UGMCAbility::OnGameplayTaskActivated(UGameplayTask& Task)
 void UGMCAbility::OnGameplayTaskDeactivated(UGameplayTask& Task)
 {
 	ActiveTasks.Remove(&Task);
+}
+
+FGMCAbilityEffectData UGMCAbility::GetEffectData(TSubclassOf<UGMCAbilityEffect> EffectClass)
+{
+
+	// Initialize an empty EffectData struct
+	FGMCAbilityEffectData EffectData;
+
+	// Check if the passed EffectClass is valid
+	if (EffectClass)
+	{
+		// Create a default object of the UGMCAbilityEffect class
+		UGMCAbilityEffect* DefaultEffect = Cast<UGMCAbilityEffect>(EffectClass->GetDefaultObject());
+
+		// If the default object exists, copy its effect data
+		if (DefaultEffect)
+		{
+			EffectData = DefaultEffect->GetEffectData();
+		}
+	}
+
+	// Return the populated EffectData struct
+	return EffectData;
+}
+
+FGMCAbilityEffectData UGMCAbility::ChangeModifierTagValue(FGMCAbilityEffectData EffectData, FGameplayTag AttributeTag, float Value, bool& bWasModified)
+{
+	FGMCAbilityEffectData TempEffectData = EffectData;
+
+	if (TempEffectData.Modifiers.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NO MODIFIERS TO MODIFY BRUH"));
+		return EffectData;
+	}
+
+	FGMCAttributeModifier* ModifierToUpdate = nullptr;
+
+	// Find the matching modifier
+	for (auto& Modifier : TempEffectData.Modifiers)
+	{
+		if (Modifier.AttributeTag.MatchesTag(AttributeTag))
+		{
+			ModifierToUpdate = &Modifier;
+			break;
+		}
+	}
+
+	if (ModifierToUpdate)
+	{
+		// Create a new modifier based on the existing one, but update the value
+		FGMCAttributeModifier ModifierNew = *ModifierToUpdate;
+		ModifierNew.Value = Value; // Update the value
+
+		// Remove the old modifier and add the new one
+		TempEffectData.Modifiers.Remove(*ModifierToUpdate);
+		TempEffectData.Modifiers.AddUnique(ModifierNew);
+		bWasModified = true;
+	}
+	
+	return EffectData;
+
 }
 
 

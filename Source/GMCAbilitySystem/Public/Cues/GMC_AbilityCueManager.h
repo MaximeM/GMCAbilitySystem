@@ -7,13 +7,13 @@
 #include "GameCue_Actor.h"
 #include "AssetRegistry/AssetData.h"
 #include "UObject/Object.h"
-#include "AssetRegistry/AssetRegistryModule.h"
-
 #include "GMC_AbilityCueManager.generated.h"
 
 /**
  * 
  */
+
+
 UCLASS()
 class GMCABILITYSYSTEM_API UGMC_AbilityCueManager : public UDataAsset
 {
@@ -36,11 +36,21 @@ class GMCABILITYSYSTEM_API UGMC_AbilityCueManager : public UDataAsset
 	void LoadGameCueObjectsFromPath(const FString& Path);
 	void LoadGameCueActorsFromPath(const FString& Path);
 
+	void OnEffectRemoved(int EffectID);
+	void OnEffectAdded(int EffectID, UObject* Object);
+
 private:
-	
+
+	UPROPERTY()
+	TArray<int> ActiveEffects;
+
+	// Declare the TMap with pointers to TArray<UObject*
+
+	TMap<int32, TArray<UObject*>*> CueToPlay;
 
 	UPROPERTY()
 	TMap<FGameplayTag, TSoftClassPtr<UGameCue_Object>> GameCuesObjectCollection;
+	UPROPERTY()
 	TMap<FGameplayTag, TSoftClassPtr<AGameCue_Actor>> GameCueActorCollection;
 
 };

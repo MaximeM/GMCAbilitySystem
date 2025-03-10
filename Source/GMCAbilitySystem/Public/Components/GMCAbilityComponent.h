@@ -11,15 +11,17 @@
 #include "Ability/Tasks/GMCAbilityTaskData.h"
 #include "Effects/GMCAbilityEffect.h"
 #include "Components/ActorComponent.h"
-#include "Cues/GMC_AbilityCueManager.h"
 #include "Utility/GMASBoundQueue.h"
 #include "Utility/GMASSyncedEvent.h"
+#include "Cues/GMC_AbilityCueManager.h"
 #include "GMCAbilityComponent.generated.h"
 
 
 class UGMCAbilityAnimInstance;
 class UGMCAbilityMapData;
 class UGMCAttributesData;
+
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPreAttributeChanged, UGMCAttributeModifierContainer*, AttributeModifierContainer, UGMC_AbilitySystemComponent*,
                                              SourceAbilityComponent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnAttributeChanged, FGameplayTag, AttributeTag, float, OldValue, float, NewValue);
@@ -31,6 +33,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSyncedEvent, const FGMASSyncedEve
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnActiveTagsChanged, FGameplayTagContainer, AddedTags, FGameplayTagContainer, RemovedTags);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FGameplayTagFilteredMulticastDelegate, const FGameplayTagContainer&, const FGameplayTagContainer&);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEffectChanged, int, EffectID, bool, bIsEffectAdded);
+
+
 
 USTRUCT()
 struct FEffectStatePrediction
@@ -191,18 +197,20 @@ public:
 
 	/* CUES */
 	UFUNCTION(BlueprintCallable, Category = "GMCAbilitySystem|Cues")
-	void TriggerCueByTag(FGameplayTag Tag, AActor* TargetActor);
+	void TriggerCueByTag(FGameplayTag Tag, AActor* TargetActor,float Duration = 0.0f,int Effect_ID = -1);
 
 	UFUNCTION( NetMulticast , Unreliable )
-	void MulticastTriggerCueByTag(FGameplayTag Tag, AActor* TargetActor);
+	void MulticastTriggerCueByTag(FGameplayTag Tag, AActor* TargetActor, float Duration = 0.0f, int Effect_ID = -1);
 
 
-
-	UPROPERTY()
-	UGMC_AbilityCueManager* GameCueManager;
+	UFUNCTION(NetMulticast, Reliable)
+	void MultiCast_EffectRemoved(int32 EffectID);
 
 	
-	// Do not call directly on client, go through QueueAbility
+	UPROPERTY()
+	UGMC_AbilityCueManager* GameCueManager;
+	
+	// Do not call directly on client, go through QueueAbilityint EffectID = -1);
 	void TryActivateAbilitiesByInputTag(const FGameplayTag& InputTag, const UInputAction* InputAction = nullptr, bool bFromMovementTick=true);
 	
 	// Do not call directly on client, go through QueueAbility. Can be used to call server-side abilities (like AI).
@@ -409,6 +417,9 @@ public:
 	// Called when the set of active tags changes.
 	UPROPERTY(BlueprintAssignable)
 	FOnActiveTagsChanged OnActiveTagsChanged;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnEffectChanged OnEffectChanged;
 
 	// Called when a synced event is executed
 	UPROPERTY(BlueprintAssignable)

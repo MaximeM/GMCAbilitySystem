@@ -53,11 +53,12 @@ void UGMCAbilityEffect::InitializeEffect(FGMCAbilityEffectData InitializationDat
 
 void UGMCAbilityEffect::StartEffect()
 {
+	//UE_LOG(LogTemp, Warning, TEXT("Effect ID: %d"), EffectData.EffectID);
 	bHasStarted = true;
 	UE_LOG(LogTemp, Warning, TEXT("EffectTag: %s"), *EffectData.EffectTag.ToString());
 	UE_LOG(LogTemp, Warning, TEXT("GameCues: %s"), *EffectData.GameCues.ToString());
 	UE_LOG(LogTemp, Warning, TEXT("GrantedTags: %s"), *EffectData.GrantedTags.ToString());
-
+	UE_LOG(LogTemp, Warning, TEXT("Effect ID: %d"), EffectData.EffectID);
 
 	if (!EffectData.GameCues.IsEmpty())
 	{
@@ -70,7 +71,9 @@ void UGMCAbilityEffect::StartEffect()
 			}
 			if (OwnerAbilityComponent != nullptr)
 			{
-				OwnerAbilityComponent->TriggerCueByTag(Cue, OwnerAbilityComponent->GetOwner());
+			
+					OwnerAbilityComponent->TriggerCueByTag(Cue, OwnerAbilityComponent->GetOwner(),EffectData.Duration, EffectData.EffectID);
+			
 			}else
 			{
 				UE_LOG(LogTemp, Warning, TEXT("NO ABILITY COMP"));
